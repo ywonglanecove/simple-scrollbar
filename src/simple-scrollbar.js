@@ -1,37 +1,39 @@
 (function (w, d) {
-  var raf = w.requestAnimationFrame || w.setImmediate || function (c) { return setTimeout(c, 0); };
+  const raf = w.requestAnimationFrame || w.setImmediate || setTimeout;
+  const barHtml = '<div class="ss-scroll">';
+  const visibilityObserverOptions = { attributes: true, attributeFilter: ["class", "style"] };
+  const contentObserverOptions = { attributes: true, childList: true, subtree: true, attributeFilter: ["class", "style"] };
 
   function initEl(el) {
-    if (el.hasOwnProperty('data-simple-scrollbar')) return;
-    Object.defineProperty(el, 'data-simple-scrollbar', new SimpleScrollbar(el));
+    if (el.getAttribute('data-simple-scrollbar')) return;
+    SimpleScrollbar(el);
+    el.setAttribute('data-simple-scrollbar', 'true');
   }
 
   // Mouse drag handler
-  function dragDealer(el, context) {
-    var lastPageY;
+  function dragDealer(handle, container, getRatio) {
+    var _lastPageY;
 
-    el.addEventListener('mousedown', function (e) {
-      lastPageY = e.pageY;
-      el.classList.add('ss-grabbed');
+    handle.addEventListener('mousedown', function (e) {
+      _lastPageY = e.pageY;
+      handle.classList.add('ss-grabbed');
       d.body.classList.add('ss-grabbed');
-
       d.addEventListener('mousemove', drag);
       d.addEventListener('mouseup', stop);
-
       return false;
     });
 
     function drag(e) {
-      var delta = e.pageY - lastPageY;
-      lastPageY = e.pageY;
+      const delta = e.pageY - _lastPageY;
+      _lastPageY = e.pageY;
 
       raf(function () {
-        context.el.scrollTop += delta / context.scrollRatio;
+        container.scrollTop += delta / getRatio();
       });
     }
 
     function stop() {
-      el.classList.remove('ss-grabbed');
+      handle.classList.remove('ss-grabbed');
       d.body.classList.remove('ss-grabbed');
       d.removeEventListener('mousemove', drag);
       d.removeEventListener('mouseup', stop);
@@ -43,119 +45,100 @@
   }
 
   function getHiddenAncestorOrItself(element) {
-    var parent = element.parentNode
+    const parent = element.parentNode
     return !elementIsHidden(parent) ?
       element :
       getHiddenAncestorOrItself(parent);
   }
  
   function debounce(delay, func) {
-    var due;
+    var _due;
     return function () {
       const start = (new Date()).valueOf();
       function tryCall() {
         const now = (new Date()).valueOf();
-        if (now >= due) {
+        if (now >= _due) {
           func();
         } else {
-          setTimeout(tryCall, due - now);
+          setTimeout(tryCall, _due - now);
         }
       }
-      if (due !== undefined && start < due) {
+      if (_due !== undefined && start < _due) {
       } else {
         setTimeout(tryCall, delay);
       }
-      due = start + delay;
+      _due = start + delay;
     };
   }
   // Constructor
-  function ss(el) {
-    this.target = el;
+  function ss(target) {
+    var _scrollRatio = 1;
 
-    this.direction = window.getComputedStyle(this.target).direction;
+    function updateHandle() {
+      const totalHeight = viewport.scrollHeight;
+      const ownHeight = viewport.clientHeight;
 
-    this.bar = '<div class="ss-scroll">';
-
-    this.wrapper = d.createElement('div');
-    this.wrapper.setAttribute('class', 'ss-wrapper');
-
-    this.el = d.createElement('div');
-    this.el.setAttribute('class', 'ss-content');
-
-    if (this.direction === 'rtl') {
-      this.el.classList.add('rtl');
-    }
-
-    this.wrapper.appendChild(this.el);
-
-    while (this.target.firstChild) {
-      this.el.appendChild(this.target.firstChild);
-    }
-    this.target.appendChild(this.wrapper);
-
-    this.target.insertAdjacentHTML('beforeend', this.bar);
-    this.bar = this.target.lastChild;
-
-    dragDealer(this.bar, this);
-    this.moveBar();
-    var moveBar = this.moveBar.bind(this);
-    const moveBarDebounced = debounce(200, moveBar);
-
-    this.el.addEventListener('scroll', moveBar);
-    this.el.addEventListener('mouseenter', moveBar);
-
-    this.target.classList.add('ss-container');
-
-    var css = window.getComputedStyle(el);
-    if (css['height'] === '0px' && css['max-height'] !== '0px') {
-      el.style.height = css['max-height'];
-    }
-    if (elementIsHidden(el)) {
-      var visibilityObserver = new MutationObserver(function (visibilityMutations) {
-        moveBar();
-        visibilityObserver.disconnect();
-      });
-      var config = { attributes: true, attributeFilter: ["class", "style"], childList: false, characterData: false, subtree: false };
-      visibilityObserver.observe(getHiddenAncestorOrItself(el), config);
-    }
-    var mutationObserver = new MutationObserver(function (mutations) {
-      moveBarDebounced();
-    });
-    var observerOptions = { attributes: true, childList: true, characterData: false, subtree: true, attributeFilter: ["class", "style"] };
-    mutationObserver.observe(this.el, observerOptions);
-  }
-
-  ss.prototype = {
-    moveBar: function (e) {
-      var totalHeight = this.el.scrollHeight,
-        ownHeight = this.el.clientHeight,
-        _this = this;
-
-      this.scrollRatio = ownHeight / totalHeight;
-
-      var isRtl = _this.direction === 'rtl';
-      var right = isRtl ?
-        (_this.target.clientWidth - _this.bar.clientWidth + 18) :
-        (_this.target.clientWidth - _this.bar.clientWidth) * -1;
+      _scrollRatio = ownHeight / totalHeight;
+      const isRtl = direction === 'rtl';
+      const right = isRtl ?
+        (target.clientWidth - handle.clientWidth + 18) :
+        (target.clientWidth - handle.clientWidth) * -1;
 
       raf(function () {
         // Hide scrollbar if no scrolling is possible
-        if (_this.scrollRatio >= 1) {
-          _this.bar.classList.add('ss-hidden')
+        if (_scrollRatio >= 1) {
+          handle.classList.add('ss-hidden')
         } else {
-          _this.bar.classList.remove('ss-hidden')
-          _this.bar.style.cssText = 'height:' + Math.max(_this.scrollRatio * 100, 10) + '%; top:' + (_this.el.scrollTop / totalHeight) * 100 + '%;right:' + right + 'px;';
+          handle.classList.remove('ss-hidden')
+          handle.style.cssText = 'height:' + Math.max(_scrollRatio * 100, 10) + '%; top:' + (viewport.scrollTop / totalHeight) * 100 + '%;right:' + right + 'px;';
         }
       });
     }
-  }
+    const direction = window.getComputedStyle(target).direction;
+    const wrapper = d.createElement('div');
+    wrapper.setAttribute('class', 'ss-wrapper');
 
-  function initAll() {
-    var nodes = d.querySelectorAll('*[ss-container]');
-
-    for (var i = 0; i < nodes.length; i++) {
-      initEl(nodes[i]);
+    const viewport = d.createElement('div');
+    viewport.setAttribute('class', 'ss-content');
+    if (direction === 'rtl') {
+      viewport.classList.add('rtl');
     }
+    wrapper.appendChild(viewport);
+    while (target.firstChild) {
+      viewport.appendChild(target.firstChild);
+    }
+    target.appendChild(wrapper);
+    target.insertAdjacentHTML('beforeend', barHtml);
+    const handle = target.lastChild;
+
+    dragDealer(handle, viewport, () =>  _scrollRatio);
+
+    updateHandle();
+
+    viewport.addEventListener('scroll', updateHandle);
+    viewport.addEventListener('mouseenter', updateHandle);
+
+    target.classList.add('ss-container');
+
+    const css = window.getComputedStyle(viewport);
+    if (css['height'] === '0px' && css['max-height'] !== '0px') {
+      viewport.style.height = css['max-height'];
+    }
+    if (elementIsHidden(viewport)) {
+      const visibilityObserver = new MutationObserver(function (visibilityMutations) {
+        if (!elementIsHidden(viewport)) {
+          updateHandle();
+          visibilityObserver.disconnect();
+        }  
+      });
+      visibilityObserver.observe(getHiddenAncestorOrItself(viewport), visibilityObserverOptions);
+    }
+    (new MutationObserver(debounce(200, updateHandle))).observe(viewport, contentObserverOptions);
+  };
+  
+  function initAll() {
+    const nodes = d.querySelectorAll('*[ss-container]');
+    Array.prototype.forEach.call(nodes, initEl);
   }
 
   d.addEventListener('DOMContentLoaded', initAll);
