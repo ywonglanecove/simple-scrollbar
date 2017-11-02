@@ -237,7 +237,7 @@ describe('simple scrollbar', function () {
         });
     });
     describe('drag', function () {
-        fit('should set scrollTop', function (done) {
+        it('should set scrollTop', function (done) {
             viewport.style.height = '100px';
             content.style.height = '200px';
             SimpleScrollbar.initEl(viewport);
@@ -259,7 +259,7 @@ describe('simple scrollbar', function () {
                 });
             });
         });
-        fit('should adjust scrollTop if scroll handle is set to min heigh', function (done) {
+        it('should adjust scrollTop if scroll handle is set to min heigh', function (done) {
             viewport.style.height = '100px';
             content.style.height = '2000px';
             SimpleScrollbar.initEl(viewport);
